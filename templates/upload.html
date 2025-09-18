@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="bi bi-cloud-arrow-up me-2"></i>Subir Nuevo Documento</h3>
+                </div>
+                
+                <div class="card-body p-4">
+                    <form method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        <!-- Nombre de la Embarcación -->
+                        <div class="mb-4">
+                            <label for="nombre_embarcacion" class="form-label fw-bold">Embarcación <span class="text-danger">*</span></label>
+                            <select class="form-select" id="nombre_embarcacion" name="nombre_embarcacion" required>
+                                <option value="" selected disabled>Seleccione una embarcación</option>
+                                {% for embarcacion in embarcaciones %}
+                                <option value="{{ embarcacion }}">{{ embarcacion }}</option>
+                                {% endfor %}
+                                <option value="otro">Otra embarcación (especificar)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Otra Embarcación (oculto inicialmente) -->
+                        <div class="mb-4" id="otra-embarcacion-container" style="display: none;">
+                            <label for="otra_embarcacion" class="form-label fw-bold">Nombre de la embarcación <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="otra_embarcacion" name="otra_embarcacion">
+                        </div>
+                        
+                        <!-- Descripción -->
+                        <div class="mb-4">
+                            <label for="descripcion" class="form-label fw-bold">Descripción</label>
+                            <textarea class="form-control" id="descripcion" name="descripcion" rows="3" placeholder="Descripción del documento..."></textarea>
+                        </div>
+                        
+                        <!-- Subida de Archivo -->
+                        <div class="mb-4">
+                            <label for="documento" class="form-label fw-bold">Documento <span class="text-danger">*</span></label>
+                            <div class="file-upload-box">
+                                <input type="file" class="form-control" id="documento" name="documento" required
+                                       accept=".pdf,.jpg,.jpeg,.png">
+                                <div class="invalid-feedback">
+                                    Por favor seleccione un archivo PDF o imagen.
+                                </div>
+                                <small class="text-muted">Formatos permitidos: PDF, JPG, JPEG, PNG (Máx. 16MB)</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Estado de Seguimiento -->
+                        <div class="mb-4">
+                            <label for="estado" class="form-label fw-bold">Estado <span class="text-danger">*</span></label>
+                            <select class="form-select" id="estado" name="estado" required>
+                                {% for estado in estados_seguimiento %}
+                                <option value="{{ estado }}" {% if loop.first %}selected{% endif %}>{{ estado }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Observaciones -->
+                        <div class="mb-4">
+                            <label for="observaciones" class="form-label fw-bold">Observaciones</label>
+                            <textarea class="form-control" id="observaciones" name="observaciones" rows="2" placeholder="Observaciones adicionales..."></textarea>
+                        </div>
+                        
+                        <!-- Botones -->
+                        <div class="d-flex justify-content-end gap-3 mt-4">
+                            <a href="{{ url_for('list_documents') }}" class="btn btn-outline-secondary px-4">
+                                <i class="bi bi-x-circle me-2"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-cloud-arrow-up me-2"></i>Subir Documento
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mostrar/ocultar campo para otra embarcación
+    const embarcacionSelect = document.getElementById('nombre_embarcacion');
+    const otraEmbarcacionContainer = document.getElementById('otra-embarcacion-container');
+    
+    embarcacionSelect.addEventListener('change', function() {
+        if (this.value === 'otro') {
+            otraEmbarcacionContainer.style.display = 'block';
+            document.getElementById('otra_embarcacion').setAttribute('required', '');
+        } else {
+            otraEmbarcacionContainer.style.display = 'none';
+            document.getElementById('otra_embarcacion').removeAttribute('required');
+        }
+    });
+    
+    // Validación de formulario
+    const form = document.querySelector('.needs-validation');
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    }, false);
+});
+</script>
+{% endblock %}

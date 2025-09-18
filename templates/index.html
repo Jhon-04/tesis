@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto text-center">
+        <h1 class="mb-4">Bienvenido al Sistema de Gestión de Documentos</h1>
+        <p class="lead">SERVICIOS NAVALES BIMBO E.I.R.L.</p>
+        
+        <div class="card mt-5">
+            <div class="card-body">
+                <h5 class="card-title">Gestión de Documentos de Buceo</h5>
+                <p class="card-text">
+                    Sube, gestiona y realiza seguimiento a los documentos de servicios de buceo.
+                    Mantén un registro del estado de pago y otras observaciones importantes.
+                </p>
+                <div class="d-grid gap-2 d-md-block mt-3">
+                    <a href="{{ url_for('upload_document') }}" class="btn btn-primary me-md-2">
+                        <i class="bi bi-upload"></i> Subir Documento
+                    </a>
+                    <a href="{{ url_for('list_documents') }}" class="btn btn-success">
+                        <i class="bi bi-files"></i> Ver Documentos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

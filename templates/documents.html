@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0"><i class="bi bi-files me-2"></i>Gestión de Documentos</h2>
+                <a href="{{ url_for('upload_document') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-2"></i>Nuevo Documento
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Formulario de Búsqueda Avanzada -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-search me-2"></i>Búsqueda Avanzada</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form id="search-form" method="GET" action="{{ url_for('list_documents') }}">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <select id="search-type" name="search_type" class="form-select">
+                                    {% for tipo in tipos_busqueda %}
+                                    <option value="{{ tipo.value }}" {% if search_type == tipo.value %}selected{% endif %}>
+                                        {{ tipo.label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6" id="text-search-container">
+                                <div class="search-box position-relative">
+                                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3"></i>
+                                    <input type="text" id="search-input" name="q" class="form-control ps-5" 
+                                           placeholder="Buscar documentos..." value="{{ search_query }}">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6" id="date-search-container" style="display: none;">
+                                <div class="row g-2">
+                                    <div class="col">
+                                        <input type="date" id="fecha-inicio" name="fecha_inicio" 
+                                               class="form-control" value="{{ fecha_inicio }}"
+                                               placeholder="Fecha inicio">
+                                    </div>
+                                    <div class="col">
+                                        <input type="date" id="fecha-fin" name="fecha_fin" 
+                                               class="form-control" value="{{ fecha_fin }}"
+                                               placeholder="Fecha fin">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-search me-2"></i>Buscar
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Resultados y Botones de Reporte -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="badge bg-info me-2">
+                        <i class="bi bi-file-text me-1"></i>{{ documents|length }} documentos
+                    </span>
+                    {% if search_type == 'fecha' and fecha_inicio and fecha_fin %}
+                    <span class="badge bg-secondary">
+                        <i class="bi bi-calendar me-1"></i>{{ fecha_inicio }} al {{ fecha_fin }}
+                    </span>
+                    {% endif %}
+                </div>
+                
+                {% if search_type == 'fecha' and fecha_inicio and fecha_fin %}
+                <div>
+                    <form method="POST" action="{{ url_for('generate_report') }}" class="d-inline me-2">
+                        <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio }}">
+                        <input type="hidden" name="fecha_fin" value="{{ fecha_fin }}">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-eye me-2"></i>Ver Reporte
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('download_pdf') }}" class="d-inline">
+                        <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio }}">
+                        <input type="hidden" name="fecha_fin" value="{{ fecha_fin }}">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-download me-2"></i>Descargar PDF
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabla de Documentos -->
+    <div class="row">
+        <div class="col">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Embarcación</th>
+                                    <th>Documento</th>
+                                    <th>Estado</th>
+                                    <th>Subido por</th>
+                                    <th>Fecha</th>
+                                    <th class="text-end">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="documents-table-body">
+                                {% for doc in documents %}
+                                <tr>
+                                    <td><strong>#{{ doc.id }}</strong></td>
+                                    <td>{{ doc.nombre }}</td>
+                                    <td>
+                                        <a href="{{ url_for('download_file', filename=doc.ruta_archivo) }}" 
+                                           class="text-decoration-none" target="_blank">
+                                            <i class="bi bi-file-earmark-arrow-down me-2"></i>{{ doc.nombre_archivo }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if doc.estado == 'PAGADO' %}bg-success
+                                            {% elif doc.estado == 'SE ENVIÓ PRESUPUESTO' %}bg-info
+                                            {% elif doc.estado == 'TIENE ORDEN DE COMPRA' %}bg-primary
+                                            {% elif doc.estado == 'SE ENVIÓ CONFORMIDAD' %}bg-secondary
+                                            {% elif doc.estado == 'TIENE HES PARA FACTURAR' %}bg-warning text-dark
+                                            {% elif doc.estado == 'SE FACTURÓ' %}bg-purple
+                                            {% else %}bg-light text-dark{% endif %}">
+                                            {{ doc.estado }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark">
+                                            <i class="bi bi-person me-1"></i>{{ doc.usuario_nombre }}
+                                        </span>
+                                    </td>
+                                    <td>{{ doc.fecha_subida.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td class="text-end">
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('edit_document', id=doc.id) }}" 
+                                               class="btn btn-sm btn-outline-primary" title="Editar">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </a>
+                                            <form method="POST" action="{{ url_for('delete_document', id=doc.id) }}" 
+                                                  class="d-inline" 
+                                                  onsubmit="return confirm('¿Confirmas que deseas eliminar este documento?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">
+                                        <div class="alert alert-info mb-0">
+                                            <i class="bi bi-info-circle me-2"></i>
+                                            {% if search_query or (fecha_inicio and fecha_fin) %}
+                                            No se encontraron documentos que coincidan con la búsqueda.
+                                            {% else %}
+                                            No hay documentos registrados. 
+                                            <a href="{{ url_for('upload_document') }}" class="alert-link">Sube tu primer documento</a>.
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchType = document.getElementById('search-type');
+    const textSearchContainer = document.getElementById('text-search-container');
+    const dateSearchContainer = document.getElementById('date-search-container');
+    
+    // Mostrar/ocultar campos según tipo de búsqueda
+    function toggleSearchFields() {
+        if (searchType.value === 'fecha') {
+            textSearchContainer.style.display = 'none';
+            dateSearchContainer.style.display = 'block';
+        } else {
+            textSearchContainer.style.display = 'block';
+            dateSearchContainer.style.display = 'none';
+        }
+    }
+    
+    // Inicializar
+    toggleSearchFields();
+    
+    // Cambiar campos cuando cambia el tipo de búsqueda
+    searchType.addEventListener('change', toggleSearchFields);
+    
+    // Validación de fechas
+    const searchForm = document.getElementById('search-form');
+    searchForm.addEventListener('submit', function(e) {
+        if (searchType.value === 'fecha') {
+            const fechaInicio = document.getElementById('fecha-inicio').value;
+            const fechaFin = document.getElementById('fecha-fin').value;
+            
+            if (!fechaInicio || !fechaFin) {
+                e.preventDefault();
+                alert('Por favor seleccione ambas fechas para realizar la búsqueda.');
+                return false;
+            }
+            
+            if (fechaInicio > fechaFin) {
+                e.preventDefault();
+                alert('La fecha de inicio no puede ser mayor a la fecha final.');
+                return false;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

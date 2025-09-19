@@ -15,6 +15,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
 from reportlab.platypus.flowables import KeepTogether
 import io
+import time
 
 app = Flask(__name__)
 app.secret_key = '20541651889-bimbo-secret-key-advanced'
@@ -62,6 +63,10 @@ TIPOS_BUSQUEDA = [
     {'value': 'fecha', 'label': 'Por fecha'}
 ]
 
+# Cache para resultados de búsqueda
+search_cache = {}
+CACHE_TIMEOUT = 300  # 5 minutos
+
 # Context processor para inyectar variables globales
 @app.context_processor
 def inject_global_vars():
@@ -92,6 +97,21 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+def get_cached_search(key):
+    """Obtiene resultados de búsqueda desde la cache"""
+    if key in search_cache:
+        cached_data = search_cache[key]
+        if time.time() - cached_data['timestamp'] < CACHE_TIMEOUT:
+            return cached_data['data']
+    return None
+
+def set_cached_search(key, data):
+    """Guarda resultados de búsqueda en la cache"""
+    search_cache[key] = {
+        'data': data,
+        'timestamp': time.time()
+    }
 
 @app.route('/')
 @login_required
@@ -165,6 +185,11 @@ def upload_document():
                 )
                 
                 DocumentModel.create(mysql, document)
+                
+                # Limpiar cache después de subir nuevo documento
+                global search_cache
+                search_cache = {}
+                
                 flash('Documento subido exitosamente!', 'success')
                 return redirect(url_for('list_documents'))
             
@@ -179,17 +204,30 @@ def upload_document():
 @app.route('/documents')
 @login_required
 def list_documents():
-    query = request.args.get('q', '')
+    query = request.args.get('q', '').strip()
     search_type = request.args.get('search_type', 'todo')
     fecha_inicio = request.args.get('fecha_inicio', '')
     fecha_fin = request.args.get('fecha_fin', '')
     
-    if search_type == 'fecha' and fecha_inicio and fecha_fin:
-        documents = DocumentModel.search_by_date(mysql, fecha_inicio, fecha_fin)
-    elif query:
-        documents = DocumentModel.search(mysql, query, search_type)
+    # Generar clave única para la cache
+    cache_key = f"{search_type}:{query}:{fecha_inicio}:{fecha_fin}"
+    
+    # Intentar obtener de cache primero
+    cached_documents = get_cached_search(cache_key)
+    
+    if cached_documents is not None:
+        documents = cached_documents
     else:
-        documents = DocumentModel.get_all(mysql)
+        # Búsqueda en base de datos
+        if search_type == 'fecha' and fecha_inicio and fecha_fin:
+            documents = DocumentModel.search_by_date(mysql, fecha_inicio, fecha_fin)
+        elif query:
+            documents = DocumentModel.search(mysql, query, search_type)
+        else:
+            documents = DocumentModel.get_all(mysql)
+        
+        # Guardar en cache
+        set_cached_search(cache_key, documents)
     
     return render_template('documents.html', 
                          documents=documents, 
@@ -201,17 +239,35 @@ def list_documents():
 @app.route('/api/documents')
 @login_required
 def api_documents():
-    query = request.args.get('q', '')
+    query = request.args.get('q', '').strip()
     search_type = request.args.get('search_type', 'todo')
     fecha_inicio = request.args.get('fecha_inicio', '')
     fecha_fin = request.args.get('fecha_fin', '')
     
-    if search_type == 'fecha' and fecha_inicio and fecha_fin:
-        documents = DocumentModel.search_by_date(mysql, fecha_inicio, fecha_fin)
-    elif query:
-        documents = DocumentModel.search(mysql, query, search_type)
+    # Generar clave única para la cache
+    cache_key = f"api:{search_type}:{query}:{fecha_inicio}:{fecha_fin}"
+    
+    # Intentar obtener de cache primero
+    cached_documents = get_cached_search(cache_key)
+    
+    if cached_documents is not None:
+        documents = cached_documents
     else:
-        documents = DocumentModel.get_all(mysql)
+        # Búsqueda en base de datos
+        if search_type == 'fecha' and fecha_inicio and fecha_fin:
+            documents = DocumentModel.search_by_date(mysql, fecha_inicio, fecha_fin)
+        elif query:
+            documents = DocumentModel.search(mysql, query, search_type)
+        else:
+            documents = DocumentModel.get_all(mysql)
+        
+        # Guardar en cache
+        set_cached_search(cache_key, documents)
+    
+    # Asegurarse de que todos los documentos tengan usuario_nombre
+    for doc in documents:
+        if not hasattr(doc, 'usuario_nombre') or doc.usuario_nombre is None:
+            doc.usuario_nombre = "Usuario Desconocido"
     
     return jsonify([doc.to_dict() for doc in documents])
 
@@ -235,6 +291,11 @@ def edit_document(id):
         document.observaciones = request.form.get('observaciones', document.observaciones)
         
         DocumentModel.update(mysql, document)
+        
+        # Limpiar cache después de editar documento
+        global search_cache
+        search_cache = {}
+        
         flash('Documento actualizado exitosamente!', 'success')
         return redirect(url_for('list_documents'))
     
@@ -256,6 +317,11 @@ def delete_document(id):
                 os.remove(file_path)
             
             DocumentModel.delete(mysql, id)
+            
+            # Limpiar cache después de eliminar documento
+            global search_cache
+            search_cache = {}
+            
             flash('Documento eliminado exitosamente!', 'success')
         except Exception as e:
             flash(f'Error al eliminar documento: {str(e)}', 'danger')
@@ -273,6 +339,11 @@ def generate_report():
         return redirect(url_for('list_documents'))
     
     documents = DocumentModel.search_by_date(mysql, fecha_inicio, fecha_fin)
+    
+    # Asegurarse de que todos los documentos tengan usuario_nombre
+    for doc in documents:
+        if not hasattr(doc, 'usuario_nombre') or doc.usuario_nombre is None:
+            doc.usuario_nombre = "Usuario Desconocido"
     
     return render_template('report.html', 
                          documents=documents, 
@@ -330,6 +401,11 @@ def download_pdf():
         return redirect(url_for('list_documents'))
     
     documents = DocumentModel.search_by_date(mysql, fecha_inicio, fecha_fin)
+    
+    # Asegurarse de que todos los documentos tengan usuario_nombre
+    for doc in documents:
+        if not hasattr(doc, 'usuario_nombre') or doc.usuario_nombre is None:
+            doc.usuario_nombre = "Usuario Desconocido"
     
     # Crear PDF con márgenes optimizados
     buffer = io.BytesIO()
@@ -497,7 +573,7 @@ def download_pdf():
             summary_table = Table(summary_data, colWidths=[7*cm, 2.5*cm, 2.5*cm])
             summary_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c757d')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('TEXTCOLor', (0, 0), (-1, 0), colors.white),
                 ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),

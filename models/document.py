@@ -14,7 +14,7 @@ class Document:
         self.fecha_actualizacion = fecha_actualizacion or datetime.now()
         self.observaciones = observaciones
         self.usuario_id = usuario_id
-        self.usuario_nombre = usuario_nombre
+        self.usuario_nombre = usuario_nombre or "Usuario Desconocido"  # Valor por defecto
 
     def to_dict(self):
         return {
@@ -46,7 +46,7 @@ class Document:
     @classmethod
     def get_all(cls, db):
         query = """
-        SELECT d.*, u.nombre_completo as usuario_nombre 
+        SELECT d.*, COALESCE(u.nombre_completo, 'Usuario Desconocido') as usuario_nombre 
         FROM documentos d 
         LEFT JOIN usuarios u ON d.usuario_id = u.id 
         ORDER BY d.fecha_actualizacion DESC
@@ -59,7 +59,7 @@ class Document:
     @classmethod
     def get_by_id(cls, db, id):
         query = """
-        SELECT d.*, u.nombre_completo as usuario_nombre 
+        SELECT d.*, COALESCE(u.nombre_completo, 'Usuario Desconocido') as usuario_nombre 
         FROM documentos d 
         LEFT JOIN usuarios u ON d.usuario_id = u.id 
         WHERE d.id = %s
@@ -72,7 +72,7 @@ class Document:
     @classmethod
     def search(cls, db, search_term, search_type='todo'):
         base_query = """
-        SELECT d.*, u.nombre_completo as usuario_nombre 
+        SELECT d.*, COALESCE(u.nombre_completo, 'Usuario Desconocido') as usuario_nombre 
         FROM documentos d 
         LEFT JOIN usuarios u ON d.usuario_id = u.id 
         WHERE 
@@ -103,7 +103,7 @@ class Document:
     @classmethod
     def search_by_date(cls, db, fecha_inicio, fecha_fin):
         query = """
-        SELECT d.*, u.nombre_completo as usuario_nombre 
+        SELECT d.*, COALESCE(u.nombre_completo, 'Usuario Desconocido') as usuario_nombre 
         FROM documentos d 
         LEFT JOIN usuarios u ON d.usuario_id = u.id 
         WHERE DATE(d.fecha_subida) BETWEEN %s AND %s
